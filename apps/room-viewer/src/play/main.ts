@@ -55,8 +55,8 @@ if (roomId === 'office-v4') {
 }
 if (!q.has('nobatch')) room.optimize?.();
 progress('Preparing room lighting…', .45);
-await precompileRoomRendering(renderer, scene, room, camera);
-applyRoomRendering(renderer, scene, room, pipeline, { bloom: false });
+const precompiled = await precompileRoomRendering(renderer, scene, room, camera);
+if (precompiled) applyRoomRendering(renderer, scene, room, pipeline, { bloom: false });
 pipeline.ao = false;
 renderer.shadowMap.autoUpdate = false;
 const physics = new Physics(R, scene);

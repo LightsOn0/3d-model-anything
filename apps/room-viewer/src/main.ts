@@ -35,8 +35,10 @@ document.addEventListener('keydown', event => {
   }
 });
 
+const COARSE_POINTER = matchMedia('(pointer: coarse)').matches;
+const MAX_PIXEL_RATIO = COARSE_POINTER ? 1.5 : 2;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 renderer.setSize(viewport.clientWidth, viewport.clientHeight);
 setMaxAnisotropy(renderer.capabilities.getMaxAnisotropy());
 
@@ -127,9 +129,18 @@ async function prepareRendering() {
     owner.ceiling.forEach(c => { c.visible = true; });
     statusEl.textContent = 'Preparing room lighting…';
     pipeline.setSceneRenderer();
-    await precompileRoomRendering(renderer, scene, owner, camera);
+    try {
+      const precompiled = await precompileRoomRendering(renderer, scene, owner, camera);
+      if (room !== owner) return;
+      if (precompiled) applyRoomRendering(renderer, scene, owner, pipeline);
+      else pipeline.ao = false;
+    } catch (error) {
+      // Keep the neutral environment created at startup if a mobile driver
+      // rejects a precompile or room capture; a basic scene beats a stuck loader.
+      console.warn('Room lighting preparation failed; using basic rendering.', error);
+      pipeline.ao = false;
+    }
     if (room !== owner) return;
-    applyRoomRendering(renderer, scene, owner, pipeline);
     renderedRoom = owner;
     statusEl.textContent = roomById(roomId).label;
     })();
@@ -614,7 +625,7 @@ function renderFrame(time: number) {
   }
   const moving = time - lastMotion < 80;
   const navigating = (quality === 'fast' || (quality === 'auto' && moving));
-  resolution(navigating ? movingRatio : Math.min(devicePixelRatio, 2));
+  resolution(navigating ? movingRatio : Math.min(devicePixelRatio, MAX_PIXEL_RATIO));
   // Auto changes pixel count while retaining the room's contact shading and glow.
   const effects = source !== 'scan' && (quality !== 'fast');
   if (pipeline.ao !== effects) { pipeline.ao = effects; dirty = true; }

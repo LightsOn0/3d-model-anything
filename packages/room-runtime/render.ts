@@ -9,6 +9,8 @@ import type { AOSettings, BuiltRoom } from './types';
 import { bakeEnvironment } from './lighting';
 
 const DEFAULT_AO: Required<AOSettings> = { radius: 0.35, distanceExponent: 1.5, thickness: 1, scale: 1.1, samples: 16, intensity: 0.85, halfRes: false };
+const COARSE_POINTER = globalThis.matchMedia?.('(pointer: coarse)').matches ?? false;
+const SHADER_PRECOMPILE_TIMEOUT_MS = 12_000;
 
 // Every built-in material ends in opaque_fragment: make its output NaN/Inf-safe. Near-zero
 // (clearcoat) roughness under the strong spots can overflow the half-float target, and one
@@ -133,7 +135,7 @@ export function createPipeline(renderer: THREE.WebGLRenderer, scene: THREE.Scene
   ao.setSize = (w: number, h: number) => aoSetSize(Math.max(1, Math.round(w * aoScale)), Math.max(1, Math.round(h * aoScale)));
   const scenePass = new SceneAOPass(scene, camera, ao, Math.round(size.x * pr), Math.round(size.y * pr));
   const setAO = (s: AOSettings = {}) => {
-    const o = { ...DEFAULT_AO, ...s };
+    const o = { ...DEFAULT_AO, ...(COARSE_POINTER ? { samples: 8, halfRes: true } : {}), ...s };
     ao.updateGtaoMaterial({ radius: o.radius, distanceExponent: o.distanceExponent, thickness: o.thickness, scale: o.scale, samples: o.samples });
     ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
     ao.blendIntensity = o.intensity;
@@ -225,10 +227,20 @@ export async function precompileRoomRendering(renderer: THREE.WebGLRenderer, sce
   configureRoomRendering(renderer, scene, room);
   const previous = renderer.getRenderTarget();
   const target = new THREE.WebGLCubeRenderTarget(16, { type: THREE.HalfFloatType });
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     renderer.setRenderTarget(target);
-    await renderer.compileAsync(scene, camera);
+    // WebKit can expose KHR_parallel_shader_compile while its completion state
+    // remains pending. A bounded wait lets the first real render finish the work
+    // instead of leaving the viewer behind a permanent loading screen.
+    const completed = await Promise.race([
+      renderer.compileAsync(scene, camera).then(() => true),
+      new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), SHADER_PRECOMPILE_TIMEOUT_MS); }),
+    ]);
+    if (!completed) console.warn('Shader precompile is still pending; continuing with the first render.');
+    return completed;
   } finally {
+    if (timer !== undefined) clearTimeout(timer);
     renderer.setRenderTarget(previous);
     target.dispose();
   }
