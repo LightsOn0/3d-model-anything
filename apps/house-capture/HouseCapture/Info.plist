@@ -32,6 +32,13 @@
 	<string>3D Model Anything uses the camera and LiDAR scanner to measure your rooms and take reference photos.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict/>
+	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

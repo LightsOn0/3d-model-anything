@@ -32,6 +32,9 @@ targets:
         HouseCaptureSupportURL: "https://wesbos.github.io/3d-model-anything/support.html"
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations: {}
         UILaunchScreen: {}
         # camera/AR app: no iPad split view, which also means portrait-only is allowed
         UIRequiresFullScreen: true
